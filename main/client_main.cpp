@@ -5,11 +5,14 @@
 int main() {
     Client client;
 
-    std::string serverIP = "127.0.0.1";
+    std::string serverIP;
+    std::cout << "Enter server IP address: ";
+    std::getline(std::cin, serverIP);
+
     int port = 5000;
 
     if (!client.connectToServer(serverIP, port)) {
-        std::cerr << "Connection failed.\n";
+        std::cerr << "Connection to server failed.\n";
         return 1;
     }
 
