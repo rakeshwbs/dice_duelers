@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 #include "../include/Server.h"
 
 int main() {
@@ -11,16 +12,27 @@ int main() {
     }
 
     if (!server.acceptClient()) {
-        std::cerr << "Failed to accept client connection.\n";
+        std::cerr << "Client connection failed.\n";
         return 1;
     }
 
-    std::cout << "Waiting for client message...\n";
-    std::string clientMsg = server.receive();
-    std::cout << "Client says: " << clientMsg << "\n";
+    std::cout << "Chat started. Type 'exit' to quit.\n";
 
-    server.sendMessage("Hello from server!");
+    while (true) {
+        std::string clientMsg = server.receive();
+        if (clientMsg == "exit" || clientMsg.empty()) break;
+
+        std::cout << "Client: " << clientMsg << "\n";
+
+        std::string reply;
+        std::cout << "You (server): ";
+        std::getline(std::cin, reply);
+
+        server.sendMessage(reply);
+        if (reply == "exit") break;
+    }
+
     server.close();
-
+    std::cout << "Server disconnected.\n";
     return 0;
 }
