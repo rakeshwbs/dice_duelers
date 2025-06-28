@@ -1,10 +1,14 @@
 #include <iostream>
+#include <string>
 #include "../include/Client.h"
 
 int main() {
     Client client;
 
-    std::string serverIP = "127.0.0.1";  // Replace with host IP if using LAN
+    std::string serverIP;
+    std::cout << "Enter server IP address: ";
+    std::getline(std::cin, serverIP);
+
     int port = 5000;
 
     if (!client.connectToServer(serverIP, port)) {
@@ -12,16 +16,23 @@ int main() {
         return 1;
     }
 
-    std::string message = "Hello from client!";
-    if (client.sendMessage(message)) {
-        std::cout << "Sent: " << message << "\n";
-    } else {
-        std::cerr << "Send failed.\n";
+    std::cout << "Chat started. Type 'exit' to quit.\n";
+
+    while (true) {
+        std::string msg;
+        std::cout << "You (client): ";
+        std::getline(std::cin, msg);
+
+        client.sendMessage(msg);
+        if (msg == "exit") break;
+
+        std::string reply = client.receive();
+        if (reply == "exit" || reply.empty()) break;
+
+        std::cout << "Server: " << reply << "\n";
     }
 
-    std::string reply = client.receive();
-    std::cout << "Server replied: " << reply << "\n";
-
     client.close();
+    std::cout << "Client disconnected.\n";
     return 0;
 }
