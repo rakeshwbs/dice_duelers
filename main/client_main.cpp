@@ -1,38 +1,36 @@
+#include "../include/Player.h"
+#include "../include/GameManager.h"
+#include "../include/NetworkManager.h"
 #include <iostream>
-#include <string>
-#include "../include/Client.h"
 
 int main() {
-    Client client;
+    std::string playerName, serverIP;
+    std::cout << "[Client] Enter your name: ";
+    std::getline(std::cin, playerName);
 
-    std::string serverIP;
-    std::cout << "Enter server IP address: ";
+    std::cout << "[Client] Enter server IP address: ";
     std::getline(std::cin, serverIP);
 
-    int port = 5000;
-
-    if (!client.connectToServer(serverIP, port)) {
-        std::cerr << "Connection to server failed.\n";
+    NetworkManager net;
+    if (!net.connectToHost(serverIP, 5000)) {
+        std::cerr << "[Client] Connection to server failed.\n";
         return 1;
     }
 
-    std::cout << "Chat started. Type 'exit' to quit.\n";
+    std::cout << "[Client] Connected to server.\n";
 
-    while (true) {
-        std::string msg;
-        std::cout << "You (client): ";
-        std::getline(std::cin, msg);
+    // Send and receive names
+    net.sendMessage("NAME|" + playerName);
+    std::string nameMsg = net.receiveMessage(); // NAME|<name>
+    std::string hostName = nameMsg.substr(nameMsg.find('|') + 1);
 
-        client.sendMessage(msg);
-        if (msg == "exit") break;
+    std::cout << "[Client] Playing with host: " << hostName << "\n";
 
-        std::string reply = client.receive();
-        if (reply == "exit" || reply.empty()) break;
+    Player client(playerName, false);
+    Player host(hostName, true);
 
-        std::cout << "Server: " << reply << "\n";
-    }
+    GameManager game(client, host, net);
+    game.startGame();
 
-    client.close();
-    std::cout << "Client disconnected.\n";
     return 0;
 }

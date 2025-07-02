@@ -1,38 +1,33 @@
+#include "../include/Player.h"
+#include "../include/GameManager.h"
+#include "../include/NetworkManager.h"
 #include <iostream>
-#include <string>
-#include "../include/Server.h"
 
 int main() {
-    Server server;
+    std::string playerName;
+    std::cout << "[Server] Enter your name: ";
+    std::getline(std::cin, playerName);
 
-    int port = 5000;
-    if (!server.initialize(port)) {
-        std::cerr << "Server failed to start on port " << port << "\n";
+    NetworkManager net;
+    if (!net.host(5000)) {
+        std::cerr << "[Server] Failed to start server.\n";
         return 1;
     }
 
-    if (!server.acceptClient()) {
-        std::cerr << "Client connection failed.\n";
-        return 1;
-    }
+    std::cout << "[Server] Client connected!\n";
 
-    std::cout << "Chat started. Type 'exit' to quit.\n";
+    // Send and receive names
+    net.sendMessage("NAME|" + playerName);
+    std::string nameMsg = net.receiveMessage(); // NAME|<name>
+    std::string clientName = nameMsg.substr(nameMsg.find('|') + 1);
 
-    while (true) {
-        std::string clientMsg = server.receive();
-        if (clientMsg == "exit" || clientMsg.empty()) break;
+    std::cout << "[Server] Connected with player: " << clientName << "\n";
 
-        std::cout << "Client: " << clientMsg << "\n";
+    Player host(playerName, true);
+    Player client(clientName, false);
 
-        std::string reply;
-        std::cout << "You (server): ";
-        std::getline(std::cin, reply);
+    GameManager game(host, client, net);
+    game.startGame();
 
-        server.sendMessage(reply);
-        if (reply == "exit") break;
-    }
-
-    server.close();
-    std::cout << "Server disconnected.\n";
     return 0;
 }
