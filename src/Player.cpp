@@ -13,9 +13,7 @@ int Player::getBalance() const {
 
 void Player::updateBalance(int amount) {
     balance += amount;
-    if (balance < 0) {
-        balance = 0;
-    }
+    if (balance < 0) balance = 0;
 }
 
 void Player::setBalance(int newBalance) {

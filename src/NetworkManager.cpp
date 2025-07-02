@@ -1,4 +1,3 @@
-// NetworkManager.cpp
 #include "NetworkManager.h"
 #include <iostream>
 #include <winsock2.h>
@@ -7,6 +6,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 SOCKET sockfd;
+static std::string messageBuffer;
 
 bool NetworkManager::host(int port) {
     WSADATA wsaData;
@@ -82,7 +82,16 @@ std::string NetworkManager::receiveMessage() {
     int bytesReceived = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
     if (bytesReceived <= 0) return "[ERROR]";
     buffer[bytesReceived] = '\0';
-    return std::string(buffer);
+    messageBuffer += buffer;
+
+    size_t newlinePos = messageBuffer.find('\n');
+    if (newlinePos != std::string::npos) {
+        std::string msg = messageBuffer.substr(0, newlinePos);
+        messageBuffer = messageBuffer.substr(newlinePos + 1);
+        return msg;
+    }
+
+    return "[WAIT]"; // incomplete
 }
 
 void NetworkManager::closeConnection() {

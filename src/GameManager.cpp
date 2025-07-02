@@ -1,6 +1,7 @@
 #include "GameManager.h"
 #include <iostream>
 #include <sstream>
+#include <limits>
 #include <chrono>
 #include <thread>
 
@@ -20,85 +21,95 @@ void GameManager::startGame() {
         std::string cont;
         std::cout << "\nPlay another round? (y/n): ";
         std::cin >> cont;
+        std::cin.ignore();  // Clear newline from buffer
         if (cont != "y" && cont != "Y") {
             net.sendMessage("EXIT|" + localPlayer.getName() + " quit the game.");
             break;
         }
     }
 
-    std::cout << "\n🎮 Game Over.\n";
+    std::cout << "\n[INFO] Game Over.\n";
     net.closeConnection();
 }
 
 bool GameManager::playRound() {
-    int localGuess, localStake, remoteGuess, remoteStake;
+    int localGuess = 0, localStake = 0, remoteGuess = 0, remoteStake = 0;
 
     auto checkExit = [](const std::string& msg) -> bool {
-        return msg.rfind("EXIT|", 0) == 0; // starts with "EXIT|"
+        return msg.rfind("EXIT|", 0) == 0;
+    };
+
+    auto safeReceive = [&]() -> std::string {
+        std::string msg;
+        do {
+            msg = net.receiveMessage();
+        } while (msg == "[WAIT]");
+        std::cout << "[DEBUG] Received: " << msg << "\n";
+        return msg;
     };
 
     if (localPlayer.getIsHost()) {
         std::cout << "[You] Enter your guess (1–6): ";
         std::cin >> localGuess;
+        std::cin.ignore();  // Clear newline
         net.sendMessage("GUESS|" + std::to_string(localGuess));
 
-        std::cout << "[You] Enter your stake: ";
-        std::cin >> localStake;
+        // Stake input validation
+        while (true) {
+            std::cout << "[You] Enter your stake: ";
+            if (std::cin >> localStake && localStake > 0 && localStake <= localPlayer.getBalance()) {
+                std::cin.ignore();
+                break;
+            }
+            std::cout << "Invalid stake. Try again.\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
         net.sendMessage("STAKE|" + std::to_string(localStake));
 
-        std::string msg = net.receiveMessage(); // GUESS or EXIT
-        if (checkExit(msg)) {
-            std::cout << "\n " << msg.substr(5) << "\n";
-            return false;
-        }
+        std::string msg = safeReceive();
+        if (checkExit(msg)) return false;
         remoteGuess = std::stoi(msg.substr(msg.find('|') + 1));
 
-        msg = net.receiveMessage(); // STAKE or EXIT
-        if (checkExit(msg)) {
-            std::cout << "\n " << msg.substr(5) << "\n";
-            return false;
-        }
+        msg = safeReceive();
+        if (checkExit(msg)) return false;
         remoteStake = std::stoi(msg.substr(msg.find('|') + 1));
 
         rollDie();
-        std::cout << "[Host] Rolled:  " << dieResult << "\n";
+        std::cout << "[Host] Rolled: " << dieResult << "\n";
         net.sendMessage("ROLL|" + std::to_string(dieResult));
-
     } else {
-        std::string msg;
+        std::string msg = safeReceive();
+        if (checkExit(msg)) return false;
+        remoteGuess = std::stoi(msg.substr(msg.find('|') + 1));
+
+        msg = safeReceive();
+        if (checkExit(msg)) return false;
+        remoteStake = std::stoi(msg.substr(msg.find('|') + 1));
 
         std::cout << "[You] Enter your guess (1–6): ";
         std::cin >> localGuess;
+        std::cin.ignore();
         net.sendMessage("GUESS|" + std::to_string(localGuess));
 
-        std::cout << "[You] Enter your stake: ";
-        std::cin >> localStake;
+        while (true) {
+            std::cout << "[You] Enter your stake: ";
+            if (std::cin >> localStake && localStake > 0 && localStake <= localPlayer.getBalance()) {
+                std::cin.ignore();
+                break;
+            }
+            std::cout << "Invalid stake. Try again.\n";
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
         net.sendMessage("STAKE|" + std::to_string(localStake));
 
-        msg = net.receiveMessage(); // GUESS or EXIT
-        if (checkExit(msg)) {
-            std::cout << "\n " << msg.substr(5) << "\n";
-            return false;
-        }
-        remoteGuess = std::stoi(msg.substr(msg.find('|') + 1));
-
-        msg = net.receiveMessage(); // STAKE or EXIT
-        if (checkExit(msg)) {
-            std::cout << "\n " << msg.substr(5) << "\n";
-            return false;
-        }
-        remoteStake = std::stoi(msg.substr(msg.find('|') + 1));
-
-        msg = net.receiveMessage(); // ROLL or EXIT
-        if (checkExit(msg)) {
-            std::cout << "\n " << msg.substr(5) << "\n";
-            return false;
-        }
+        msg = safeReceive();
+        if (checkExit(msg)) return false;
         dieResult = std::stoi(msg.substr(msg.find('|') + 1));
-        std::cout << "[Client] Received roll:  " << dieResult << "\n";
+        std::cout << "[Client] Received roll: " << dieResult << "\n";
     }
 
-    // Game logic
     bool localCorrect = (localGuess == dieResult);
     bool remoteCorrect = (remoteGuess == dieResult);
 
@@ -126,13 +137,11 @@ bool GameManager::playRound() {
         std::cout << "Both guessed correctly with different numbers. Both gain their own stake.\n";
     }
 
-    // Balance sync
     net.sendMessage("BALANCE|" + std::to_string(localPlayer.getBalance()));
-    std::string balanceMsg = net.receiveMessage();
-    if (checkExit(balanceMsg)) {
-        std::cout << "\n " << balanceMsg.substr(5) << "\n";
-        return false;
-    }
+    std::string balanceMsg = safeReceive();
+    if (checkExit(balanceMsg)) return false;
+
+    std::cout << "[DEBUG] Raw balance message: " << balanceMsg << "\n";
     int remoteBalance = std::stoi(balanceMsg.substr(balanceMsg.find('|') + 1));
     remotePlayer.setBalance(remoteBalance);
 

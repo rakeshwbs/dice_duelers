@@ -16,17 +16,16 @@ int main() {
 
     std::cout << "[Server] Client connected!\n";
 
-    // Send and receive names
+    // Exchange names
     net.sendMessage("NAME|" + playerName);
-    std::string nameMsg = net.receiveMessage(); // NAME|<name>
+    std::string nameMsg = net.receiveMessage(); // NAME|<clientName>
     std::string clientName = nameMsg.substr(nameMsg.find('|') + 1);
 
     std::cout << "[Server] Connected with player: " << clientName << "\n";
 
-    Player host(playerName, true);
-    Player client(clientName, false);
-
-    GameManager game(host, client, net);
+    Player local(playerName, true);        // Server is host
+    Player remote(clientName, false);      // Client is remote
+    GameManager game(local, remote, net);
     game.startGame();
 
     return 0;
