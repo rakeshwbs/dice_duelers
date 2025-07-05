@@ -1,4 +1,5 @@
 #include "GameManager.h"
+#include "ConsoleColor.h"
 #include <iostream>
 #include <sstream>
 #include <limits>
@@ -9,26 +10,27 @@ GameManager::GameManager(Player& local, Player& remote, NetworkManager& network)
     : localPlayer(local), remotePlayer(remote), net(network), engine(std::random_device{}()) {}
 
 void GameManager::startGame() {
-    std::cout << "[INFO] Welcome to Dice Duelers over LAN!\n";
+    printColorLine("[INFO] Welcome to Dice Duelers over LAN!", ConsoleColor::Aqua);
 
     while (localPlayer.getBalance() > 0 && remotePlayer.getBalance() > 0) {
         if (!playRound()) break;
 
-        std::cout << "\nCurrent Balances:\n";
-        std::cout << localPlayer.getName() << ": $" << localPlayer.getBalance() << "\n";
-        std::cout << remotePlayer.getName() << ": $" << remotePlayer.getBalance() << "\n";
+        std::cout << "\n";
+        printColorLine("Current Balances:", ConsoleColor::LightPurple);
+        printColorLine(localPlayer.getName() + ": $" + std::to_string(localPlayer.getBalance()), ConsoleColor::LightGreen);
+        printColorLine(remotePlayer.getName() + ": $" + std::to_string(remotePlayer.getBalance()), ConsoleColor::LightBlue);
 
         std::string cont;
-        std::cout << "\nPlay another round? (y/n): ";
+        printColor("[You] Play another round? (y/n): ", ConsoleColor::LightPurple);
         std::cin >> cont;
-        std::cin.ignore();  // Clear newline from buffer
+        std::cin.ignore();
         if (cont != "y" && cont != "Y") {
             net.sendMessage("EXIT|" + localPlayer.getName() + " quit the game.");
             break;
         }
     }
 
-    std::cout << "\n[INFO] Game Over.\n";
+    printColorLine("\n[INFO] Game Over.", ConsoleColor::Aqua);
     net.closeConnection();
 }
 
@@ -44,24 +46,23 @@ bool GameManager::playRound() {
         do {
             msg = net.receiveMessage();
         } while (msg == "[WAIT]");
-        std::cout << "[DEBUG] Received: " << msg << "\n";
+        printColorLine("[DEBUG] Received: " + msg, ConsoleColor::Gray);
         return msg;
     };
 
     if (localPlayer.getIsHost()) {
-        std::cout << "[You] Enter your guess (1–6): ";
+        printColor("[You] Enter your guess (1–6): ", ConsoleColor::Yellow);
         std::cin >> localGuess;
-        std::cin.ignore();  // Clear newline
+        std::cin.ignore();
         net.sendMessage("GUESS|" + std::to_string(localGuess));
 
-        // Stake input validation
         while (true) {
-            std::cout << "[You] Enter your stake: ";
+            printColor("[You] Enter your stake: ", ConsoleColor::Yellow);
             if (std::cin >> localStake && localStake > 0 && localStake <= localPlayer.getBalance()) {
                 std::cin.ignore();
                 break;
             }
-            std::cout << "Invalid stake. Try again.\n";
+            printColorLine("Invalid stake. Try again.", ConsoleColor::LightRed);
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         }
@@ -76,7 +77,7 @@ bool GameManager::playRound() {
         remoteStake = std::stoi(msg.substr(msg.find('|') + 1));
 
         rollDie();
-        std::cout << "[Host] Rolled: " << dieResult << "\n";
+        printColorLine("[Host] Rolled: " + std::to_string(dieResult), ConsoleColor::LightYellow);
         net.sendMessage("ROLL|" + std::to_string(dieResult));
     } else {
         std::string msg = safeReceive();
@@ -87,18 +88,18 @@ bool GameManager::playRound() {
         if (checkExit(msg)) return false;
         remoteStake = std::stoi(msg.substr(msg.find('|') + 1));
 
-        std::cout << "[You] Enter your guess (1–6): ";
+        printColor("[You] Enter your guess (1–6): ", ConsoleColor::Yellow);
         std::cin >> localGuess;
         std::cin.ignore();
         net.sendMessage("GUESS|" + std::to_string(localGuess));
 
         while (true) {
-            std::cout << "[You] Enter your stake: ";
+            printColor("[You] Enter your stake: ", ConsoleColor::Yellow);
             if (std::cin >> localStake && localStake > 0 && localStake <= localPlayer.getBalance()) {
                 std::cin.ignore();
                 break;
             }
-            std::cout << "Invalid stake. Try again.\n";
+            printColorLine("Invalid stake. Try again.", ConsoleColor::LightRed);
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         }
@@ -107,41 +108,42 @@ bool GameManager::playRound() {
         msg = safeReceive();
         if (checkExit(msg)) return false;
         dieResult = std::stoi(msg.substr(msg.find('|') + 1));
-        std::cout << "[Client] Received roll: " << dieResult << "\n";
+        printColorLine("[Client] Received roll: " + std::to_string(dieResult), ConsoleColor::LightYellow);
     }
 
+    // Result evaluation
     bool localCorrect = (localGuess == dieResult);
     bool remoteCorrect = (remoteGuess == dieResult);
 
     if (!localCorrect && !remoteCorrect) {
         localPlayer.updateBalance(-localStake);
         remotePlayer.updateBalance(-remoteStake);
-        std::cout << "No one guessed correctly. Both lose stakes.\n";
+        printColorLine("No one guessed correctly. Both lose stakes.", ConsoleColor::Gray);
     } else if (localCorrect && !remoteCorrect) {
         localPlayer.updateBalance(localStake + remoteStake);
         remotePlayer.updateBalance(-remoteStake);
-        std::cout << localPlayer.getName() << " wins this round!\n";
+        printColorLine(localPlayer.getName() + " wins this round!", ConsoleColor::LightGreen);
     } else if (!localCorrect && remoteCorrect) {
         remotePlayer.updateBalance(remoteStake + localStake);
         localPlayer.updateBalance(-localStake);
-        std::cout << remotePlayer.getName() << " wins this round!\n";
+        printColorLine(remotePlayer.getName() + " wins this round!", ConsoleColor::LightGreen);
     } else if (localGuess == remoteGuess && localStake == remoteStake) {
-        std::cout << "Both guessed correctly with same guess/stake. No gain/loss.\n";
+        printColorLine("Both guessed correctly with same guess/stake. No gain/loss.", ConsoleColor::Gray);
     } else if (localGuess == remoteGuess) {
         localPlayer.updateBalance(localStake);
         remotePlayer.updateBalance(remoteStake);
-        std::cout << "Both guessed correctly. Each doubles their own stake.\n";
+        printColorLine("Both guessed correctly. Each doubles their own stake.", ConsoleColor::LightAqua);
     } else {
         localPlayer.updateBalance(localStake);
         remotePlayer.updateBalance(remoteStake);
-        std::cout << "Both guessed correctly with different numbers. Both gain their own stake.\n";
+        printColorLine("Both guessed correctly with different numbers. Both gain their own stake.", ConsoleColor::LightAqua);
     }
 
+    // Balance sync
     net.sendMessage("BALANCE|" + std::to_string(localPlayer.getBalance()));
     std::string balanceMsg = safeReceive();
     if (checkExit(balanceMsg)) return false;
 
-    std::cout << "[DEBUG] Raw balance message: " << balanceMsg << "\n";
     int remoteBalance = std::stoi(balanceMsg.substr(balanceMsg.find('|') + 1));
     remotePlayer.setBalance(remoteBalance);
 
