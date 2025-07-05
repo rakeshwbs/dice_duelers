@@ -289,3 +289,89 @@ But that **violates the intent** of a getter — it’s supposed to give you dat
 - Otherwise, both are prompted:
    → “Play another round? (y/n)”
 
+### Player.h codes
+
+```c++
+#ifndef PLAYER_H
+#define PLAYER_H
+
+#include <string>
+
+class Player {
+private:
+    std::string name;
+    int balance;
+    bool isHost;
+
+public:
+    Player(const std::string& name, bool isHost);
+
+    std::string getName() const;
+    int getBalance() const;
+    void updateBalance(int amount);
+    void setBalance(int newBalance);
+    bool getIsHost() const;
+};
+
+#endif
+```
+
+Note:
+
+```c++
+#ifndef PLAYER_H
+#define PLAYER_H
+...
+#endif
+```
+
+The lines are what we call **header guards** or **inclusion guards**. Their **significance is critical** in **C++ header files**, especially when projects grow larger and include multiple files.
+
+They ensure that the **header file is only included once** during compilation, even if it is referenced multiple times in different `.cpp` or `.h` files.
+
+#### What Each Line Means?
+
+| Directive          | Meaning                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| `#ifndef PLAYER_H` | "If this symbol `PLAYER_H` has **not** been defined yet..."  |
+| `#define PLAYER_H` | "Then define `PLAYER_H` and include everything below."       |
+| `#endif`           | "End of the condition. If `PLAYER_H` was already defined, skip this." |
+
+So, if your compiler reads this file more than once, it **won’t re-define the `Player` class**, because `PLAYER_H` is already defined from the first time.
+
+#### Why It’s Needed?
+
+In a modular C++ project:
+
+- Multiple `.cpp` files might `#include "Player.h"`.
+- If header guards are **not present**, the compiler will include the contents of `Player.h` multiple times.
+- This results in **redefinition errors** — for example: "class Player redefined".
+
+#### Example Scenario
+
+```c++
+// In GameManager.h
+#include "Player.h"
+
+// In Server.h
+#include "Player.h"
+
+// In main.cpp
+#include "GameManager.h"
+#include "Server.h"
+```
+
+Here, **Player.h is included multiple times** through indirect inclusion paths.
+ **Header guards prevent this from causing an error.**
+
+#### Alternative (Modern) Approach
+
+In modern C++ (C++20 onwards), some compilers support:
+
+```c++
+#pragma once
+```
+
+This performs the same task as `#ifndef/#define/#endif`, but it's **non-standard** (though widely supported).
+
+`#pragma once` is **shorter and simpler**, but **header guards** are more portable and still widely preferred in open-source projects.
