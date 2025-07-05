@@ -15,7 +15,7 @@
 
 #### **Use-Case Diagram**
 
-<img src="./images/use-case-player.png" style="zoom:50%;" />
+<img src="./images/use-case-player.png" alt="Use Case Diagram" width="400">
 
 ##### DESCRIPTION
 
