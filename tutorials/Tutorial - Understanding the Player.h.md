@@ -15,7 +15,10 @@
 
 #### **Use-Case Diagram**
 
-<img src="./images/use-case-player.png" alt="Use Case Diagram" width="400" align="center">
+<div align="center">
+  <img src="./images/use-case-player.png" alt="Use Case Diagram" width="450"><br>
+  <em>Figure: Use-Case Diagram for Player</em>
+</div>
 
 ##### DESCRIPTION
 
