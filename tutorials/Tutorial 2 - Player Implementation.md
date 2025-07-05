@@ -1,4 +1,4 @@
-# Tutorial 2: Implementing the Player Class – Behind the Interface
+# Tutorial 2:  Player Implementation
 
 Player.cpp
 
