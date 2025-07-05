@@ -1,4 +1,4 @@
-# Tutorial 1 - Player.H Definition
+# Tutorial 1 - Player Class Definition
 
 ## **Introduction to Use-Case Diagram**
 

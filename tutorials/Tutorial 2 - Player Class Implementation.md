@@ -1,4 +1,4 @@
-# Tutorial 2:  Player Implementation
+# Tutorial 2:  Player Class Implementation
 
 Player.cpp
 
