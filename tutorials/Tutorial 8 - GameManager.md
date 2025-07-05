@@ -1,4 +1,4 @@
-# **Tutorial 7: GameManager – Orchestrating the Game Flow**
+# **Tutorial 8: GameManager – Orchestrating the Game Flow**
 
 ###  What This Tutorial Will Cover:
 
