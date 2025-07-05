@@ -208,9 +208,9 @@ Using `const std::string&`:
 
 | Category              | Syntax                                                       | Copies Data? | Can Modify Original? | Performance (large objects) | Typical Use Case                                   |
 | --------------------- | ------------------------------------------------------------ | ------------ | -------------------- | --------------------------- | -------------------------------------------------- |
-| **Pass by Value**     | `void func(int a) <br/>``void func(std::string s)`           | ✅ Yes        | ❌ No                 | ❌ Slow for objects          | Small data types where modification is not needed  |
-| **Pass by Reference** | `void func(int& a)<br/>``void func(std::string& s)`          | ❌ No         | ✅ Yes                | ✅ Fast                      | When the function **needs to modify** the argument |
-| **Const Reference**   | `void func(const int& a)<br/>``void func(const std::string& s)` | ❌ No         | ❌ No                 | ✅ Fast                      | Read-only input without copying large objects      |
+| **Pass by Value**     | `void func(int a) <br>void func(std::string s)`              | ✅ Yes        | ❌ No                 | ❌ Slow for objects          | Small data types where modification is not needed  |
+| **Pass by Reference** | `void func(int& a)<br>void func(std::string& s)`             | ❌ No         | ✅ Yes                | ✅ Fast                      | When the function **needs to modify** the argument |
+| **Const Reference**   | `void func(const int& a)<br>void func(const std::string& s)` | ❌ No         | ❌ No                 | ✅ Fast                      | Read-only input without copying large objects      |
 
 ### Detailed Explanation
 
