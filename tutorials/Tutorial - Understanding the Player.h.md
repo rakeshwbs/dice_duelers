@@ -15,7 +15,7 @@
 
 #### **Use-Case Diagram**
 
-<img src="C:\Users\Rakesh Sonea\AppData\Roaming\Typora\typora-user-images\image-20250705184649727.png" alt="image-20250705184649727" style="zoom:50%;" />
+<img src="./images/use-case-player.png" style="zoom:50%;" />
 
 ##### DESCRIPTION
 
