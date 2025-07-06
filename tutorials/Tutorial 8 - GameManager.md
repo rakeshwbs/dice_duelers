@@ -412,3 +412,83 @@ if (std::cin >> localStake && localStake > 0 && localStake <= localPlayer.getBal
 3. Receive die result
 
 ✅ Note: client **never rolls the die** — only receives it.
+
+## Round Evaluation
+
+### Match flags:
+
+```c++
+cppCopy codebool localCorrect = (localGuess == dieResult);
+bool remoteCorrect = (remoteGuess == dieResult);
+```
+
+Then several `if...else if` branches:
+
+| Condition                                 | Outcome                       |
+| ----------------------------------------- | ----------------------------- |
+| None guessed                              | Both lose stake               |
+| One guessed                               | That player gains both stakes |
+| Both guessed same number and same stake   | No gain/loss                  |
+| Both guessed same number, different stake | Each doubles their own stake  |
+| Both guessed different correct numbers    | Each doubles own stake        |
+
+
+
+All actions are accompanied by:
+
+- **Balance updates**
+- **Colored output messages**
+
+------
+
+## 🔁 Balance Synchronization
+
+```c++
+cppCopy codenet.sendMessage("BALANCE|" + std::to_string(localPlayer.getBalance()));
+std::string balanceMsg = safeReceive();
+remotePlayer.setBalance(...);
+```
+
+- Sends current balance to remote player.
+- Receives remote balance and stores it.
+
+> ✅ Keeps both sides fully synchronized.
+
+------
+
+## 4️⃣ **rollDie()**
+
+```c++
+cppCopy codevoid GameManager::rollDie() {
+    std::uniform_int_distribution<int> dist(1, 6);
+    dieResult = dist(engine);
+}
+```
+
+- Uses `std::uniform_int_distribution` to roll fair dice
+- Stores result in `dieResult` for reuse
+
+------
+
+## 5️⃣ **getDieResult()**
+
+```c++
+cppCopy codeint GameManager::getDieResult() const {
+    return dieResult;
+}
+```
+
+- Simple getter method
+- Used only for inspection/logging
+
+------
+
+## ✅ Summary of GameManager Methods
+
+| Method             | Role                                    |
+| ------------------ | --------------------------------------- |
+| `GameManager(...)` | Constructor, sets up references and RNG |
+| `startGame()`      | Controls game loop and ending           |
+| `playRound()`      | Manages one full game round             |
+| `rollDie()`        | Randomly rolls the die (host only)      |
+| `getDieResult()`   | Returns last rolled value               |
