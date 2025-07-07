@@ -1,22 +1,6 @@
-# The Server Class – Building a Basic TCP Listener in C++
+# Tutorial 9 - Server Class
 
-### What It Will Cover:
-
-- The purpose and structure of the `Server` class
-- Key methods in `Server.h` and `Server.cpp`:
-  - `initialize(port)`
-  - `acceptClient()`
-  - `sendMessage()`
-  - `receive()`
-  - `close()`
-- How it wraps the Winsock calls (`WSAStartup`, `bind`, `listen`, `accept`, etc.)
-- Comparison with `NetworkManager::host()` and what’s similar/different
-- Why this class might be used for modular/explicit socket separation
-
-**Objective:**
- Understand how the `Server` class provides a lightweight, modular TCP server that accepts one client and allows message-based communication, using Winsock.
-
-Server.h
+Server.H
 
 ```c++
 #ifndef SERVER_H
@@ -124,15 +108,6 @@ void Server::close() {
 
 ```
 
-
-
-### Key Responsibilities:
-
-- Initialize Winsock and create a server socket
-- Accept a single client connection
-- Send and receive plain text messages
-- Handle graceful shutdown of the connection
-
 ### Constructor
 
 ```c++
@@ -142,131 +117,214 @@ Server::Server() {
 }
 ```
 
-The **constructor** of the `Server` class is responsible for preparing the server object for use. In the Dice Duelers implementation, the constructor likely initializes internal variables (for example, setting socket handles to an invalid value) and may perform any one-time setup needed for Winsock. 
+#### **Purpose & Explanation**
 
-On Windows, using Winsock requires initializing the library by calling `WSAStartup` **once** before any socket operations.
+This is the **constructor** for the `Server` class. It performs basic initialization of the class's internal state. Specifically:
 
-Set the server’s listening socket and client socket to an initial state (e.g., `INVALID_SOCKET`). This ensures the class knows these sockets are not yet open.
+🔹 `listenSocket = INVALID_SOCKET;`
 
-In summary, the constructor sets up the `Server` object’s initial state and ensures Winsock is ready to use. It doesn’t actually start listening or open any network ports yet – that part is handled in `initialize()`. Its job is simply to prepare the groundwork (data structures and possibly Winsock startup) for the real work to come.
+- This initializes the socket used for **listening for incoming client connections**.
+- `INVALID_SOCKET` is a special constant from Winsock (`#define INVALID_SOCKET (~0)`), used to indicate that no socket is currently open or valid.
+- By assigning this value upfront, the program knows that this socket is not yet active, so future logic can check this state before using or closing it.
 
-### Destructor
+🔹 `clientSocket = INVALID_SOCKET;`
+
+- This socket is used to **communicate with the connected client** once accepted.
+- It is also initialized to `INVALID_SOCKET` to indicate that no client has connected yet.
+
+### bool Server::initialize(int port) 
 
 ```c++
-Server::~Server() {
-    close();
+if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+    std::cerr << "WSAStartup failed.\n";
+    return false;
 }
 ```
 
-The **destructor** of the `Server` class makes sure that all resources are properly released when the server object is destroyed. Networking resources like sockets and the Winsock library itself must be cleaned up to avoid leaks or issues in the system.
+#### **Purpose & Detailed Explanation**
 
-In the Dice Duelers server, the destructor likely does the following:
+This line initializes the **Winsock library** on Windows. Before using any socket-related functions, you **must call `WSAStartup()`** once per process.
 
-- If the server is still running or any sockets are open, call the class’s `close()` method (or equivalent cleanup code) to shut everything down. This includes closing any open socket handles using `closesocket()` and disconnecting cleanly.
-- Call `WSACleanup()` to unload the Winsock library from the process if it was initialized earlier. Each successful call to `WSAStartup` must be matched with a `WSACleanup` when you’re done with Winsock; this releases any resources allocated by Winsock. The destructor is a safe place to put `WSACleanup()` because it runs when the server is shutting down, ensuring the network cleanup happens even if the rest of the program is terminating.
+#### **Line-by-Line Breakdown:**
 
-### Initialize(int port)
+🧩 `WSAStartup(...)`
+
+- This is the first Winsock API call you **must** make before using any other socket functions.
+- It loads the necessary DLLs and prepares the network stack for your program.
+
+------
+
+🧩 `MAKEWORD(2, 2)`
+
+- This macro combines two bytes: major version = `2`, minor version = `2`
+- You're requesting **Winsock version 2.2**, which is standard and widely supported on all modern Windows machines.
+
+------
+
+🧩 `&wsaData`
+
+- This is a pointer to a `WSADATA` structure, where Winsock stores details about the version it loaded.
+- The structure contains information like the description of the Winsock DLL, supported protocols, etc.
+- Although most programs don’t use this info directly, you must pass it as an output parameter.
+
+`!= 0`
+
+- If `WSAStartup` returns anything other than `0`, it means **initialization failed**.
+- Common causes:
+  - Winsock DLL is missing or corrupted
+  - Called too early (e.g., before system is fully initialized)
+  - Version mismatch
+
+#### If WSAStartup Fails
+
+- The function immediately logs an error to `std::cerr`
+- Returns `false` to signal failure to the calling code
+- Prevents the server from continuing setup, since any further Winsock function would crash or misbehave
+
+##### Creating a TCP Socket for Listening
 
 ```c++
-bool Server::initialize(int port) {
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed.\n";
-        return false;
-    }
-
-    listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenSocket == INVALID_SOCKET) {
-        std::cerr << "Socket creation failed.\n";
-        return false;
-    }
-
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(port);
-
-    if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "Bind failed.\n";
-        return false;
-    }
-
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-        std::cerr << "Listen failed.\n";
-        return false;
-    }
-
-    std::cout << "Server initialized. Waiting for client...\n";
-    return true;
+listenSocket = socket(AF_INET, SOCK_STREAM, 0);
+if (listenSocket == INVALID_SOCKET) {
+    std::cerr << "Socket creation failed.\n";
+    return false;
 }
 ```
 
-The `initialize(int port)` method sets up the server to start listening for client connections on a specified TCP port. This is one of the most important methods in the Server class, as it performs the step-by-step procedure to bring the server online. Here’s what happens in `initialize(port)`:
+####  **Purpose & Detailed Explanation**
 
-1. ##### **Initialize Winsock**
+This snippet creates a **server-side TCP socket**, which will be used to listen for incoming connections from clients. It is a foundational step in setting up the server.
 
-   ```c++
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-           std::cerr << "WSAStartup failed.\n";
-           return false;
-       }
-   ```
+------
 
-   - WSAStartup is called. This call loads the Winsock 2.2 library, which is required before using any socket functions. 
+#### 🔍 **Line-by-Line Breakdown**
 
-   - On success, Winsock is ready; on failure, the code likely prints an error code or returns an error status, and the server setup is aborted.
+##### 🧩 `socket(AF_INET, SOCK_STREAM, 0)`
 
-2. ##### Create a socket
+- **`AF_INET`**: Specifies the **IPv4 address family**.
+- **`SOCK_STREAM`**: Requests a **stream socket**, which means it will use **TCP** (as opposed to `SOCK_DGRAM` for UDP).
+- **`0`**: Tells the system to use the default protocol for `SOCK_STREAM`, which is **IPPROTO_TCP**.
 
-   ```c++
-    listenSocket = socket(AF_INET, SOCK_STREAM, 0);
-       if (listenSocket == INVALID_SOCKET) {
-           std::cerr << "Socket creation failed.\n";
-           return false;
-       }
-   ```
+This call returns a socket descriptor (`SOCKET` on Windows) that will be stored in the class member `listenSocket`.
 
-   The next step is to create a new socket for listening. This is done with the `socket()` function. In a TCP server, we use an IPv4 stream socket, so the code calls `socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` (or equivalently `SOCK_STREAM, 0` for default protocol). If `socket()` returns `INVALID_SOCKET`, it means the socket creation failed (perhaps due to insufficient resources or an unsupported protocol), and the code will handle that error (again, likely logging it via `WSAGetLastError()` and aborting initialization). On success, we now have a listening socket handle.
+------
 
-   3. ##### Bind the socket to a port
+##### 🧩 `if (listenSocket == INVALID_SOCKET)`
 
-      ```c++
-       serverAddr.sin_family = AF_INET;
-          serverAddr.sin_addr.s_addr = INADDR_ANY;
-          serverAddr.sin_port = htons(port);
-      
-          if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-              std::cerr << "Bind failed.\n";
-              return false;
-          }
-      ```
+- `INVALID_SOCKET` is a constant that indicates failure (usually `~0`).
+- If socket creation fails, it means the server **cannot proceed with listening**.
+  - Possible reasons include: insufficient resources, too many open sockets, or internal Winsock failure.
+- The error is logged to `std::cerr`, and `initialize()` returns `false` to signal failure.
 
-- Before the server can listen, the socket must be bound to a specific local IP address and port number. The code will prepare a `sockaddr_in` structure with the chosen port. 
+#### Configuring and Binding the Server Socket to a Port
 
-- For a typical server that accepts clients from any network interface, the address `sin_addr.s_addr` is set to `INADDR_ANY` (which means “listen on all available network interfaces”).
+```c++
+serverAddr.sin_family = AF_INET;
+serverAddr.sin_addr.s_addr = INADDR_ANY;
+serverAddr.sin_port = htons(port);
 
-- The `sin_family` is set to `AF_INET` (IPv4), and `sin_port` is set to `htons(port)` to convert the port number to network byte order. Then the code calls `bind(listenSocket, (sockaddr*)&addr, sizeof(addr))`. 
-- The `bind()` function associates our new socket with the specified IP and port on the local machine. If bind fails (returns `SOCKET_ERROR`), it usually means the port is already in use or the address is invalid. 
-- The server code will check for this and report an error if needed (e.g., “Bind failed with error code X”). 
-- A successful bind reserves that port so no other process can use it, and our socket is now *listening at that port* for incoming connections.
+if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+    std::cerr << "Bind failed.\n";
+    return false;
+}
+```
 
-4. ##### Start listening
+### **Purpose**
 
-   ```c++
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
-           std::cerr << "Listen failed.\n";
-           return false;
-       }
-   
-       std::cout << "Server initialized. Waiting for client...\n";
-       return true;
-   ```
+This snippet configures the socket’s address structure (`sockaddr_in`) and binds the listening socket to a specific **IP address and port** on the server machine. This makes the socket **reachable** so that clients can connect to it.
 
-   
+------
 
-- Once bound, the socket needs to be put into listening mode. The code calls `listen(listenSocket, backlog)`, where `backlog` is the number of incoming connections allowed to queue up (Dice Duelers might use a small number like 1 or 2 since it’s a two-player game, or use the constant `SOMAXCONN` to allow the maximum queue length)
-- . Calling `listen` on a bound socket tells the OS that this socket is a server socket ready to accept connections. If `listen` returns `SOCKET_ERROR`, that indicates a problem (which is rare if bind succeeded, but the code checks it anyway).
--  After this call, the server is officially *listening* on the given port for any client that tries to connect. In summary, the `initialize` method has now prepared a listening socket by creating it, binding it to `port`, and starting to listen.
+#### 🔍 **Line-by-Line Explanation**
 
-## acceptClient()
+##### 🧩 `serverAddr.sin_family = AF_INET;`
+
+- Sets the address family to **IPv4** (`AF_INET`).
+- Required for the socket to understand what kind of addresses it will deal with.
+
+##### 🧩 `serverAddr.sin_addr.s_addr = INADDR_ANY;`
+
+- Binds the socket to **all available local interfaces**.
+- This allows clients to connect using **any of the server’s IP addresses** (e.g., `192.168.x.x`, `127.0.0.1`, etc.).
+- If you only wanted to accept connections on a specific IP, you would use `inet_addr("192.168.1.5")`, for example.
+
+##### 🧩 `serverAddr.sin_port = htons(port);`
+
+- Sets the port number to listen on, converting it to **network byte order** using `htons()` (host-to-network short).
+- Ports must be in network byte order when used in sockets.
+
+------
+
+##### 🧩 `bind(...)`
+
+```c++
+if (bind(listenSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+```
+
+- Attempts to bind the **configured address and port** to the `listenSocket`.
+- **If `bind` fails**, the server cannot accept connections on that port.
+  - Common reasons:
+    - Port already in use
+    - Insufficient privileges (e.g., trying to bind to a restricted port like 80)
+    - Invalid socket
+- On failure, it logs the error and returns `false`.
+
+#### Putting the Server Socket into Listening Mode
+
+```c++
+if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+    std::cerr << "Listen failed.\n";
+    return false;
+}
+
+std::cout << "Server initialized. Waiting for client...\n";
+return true;
+```
+
+#### **Purpose**
+
+This snippet **transitions the socket from a bound state to a listening state**, enabling it to accept incoming client connections. It also provides **feedback to the user** indicating that the server setup was successful.
+
+------
+
+#### 🔍 **Line-by-Line Explanation**
+
+##### 🧩 `listen(listenSocket, SOMAXCONN)`
+
+- The `listen()` function instructs the socket to begin **listening** for incoming TCP connection requests.
+- Parameters:
+  - `listenSocket`: the previously created and bound socket
+  - `SOMAXCONN`: a system-defined constant specifying the **maximum length of the connection queue** (usually 5 to 200).
+    - It tells the OS how many pending connections can wait while the server is busy before being rejected.
+
+##### 🧩 Error Handling
+
+```c++
+if (listen(...) == SOCKET_ERROR) { ... }
+```
+
+- If `listen()` fails, it means the socket cannot accept connections.
+  - Possible causes:
+    - Socket not bound
+    - Resource exhaustion
+    - Already in listening mode
+- It logs the error message and halts initialization by returning `false`.
+
+------
+
+##### 🧩 `std::cout << "Server initialized. Waiting for client...\n";`
+
+- This line indicates that the **server has successfully completed setup** and is now awaiting a connection.
+- Provides useful feedback during runtime for the developer or user.
+
+------
+
+##### 🧩 `return true;`
+
+- Confirms that the `initialize()` function executed **all setup steps successfully**.
+- This enables the next phase: `acceptClient()` to be called.
+
+#### Accepting an Incoming Client Connection
 
 ```c++
 bool Server::acceptClient() {
@@ -280,10 +338,154 @@ bool Server::acceptClient() {
 }
 ```
 
-After initialization, the server is listening but not yet connected to any client. The `acceptClient()` method handles the next phase: **accepting an incoming client connection**. When a remote client (in our case, the player who chose to join the game) tries to connect to the host’s IP and port, the listening socket will detect this. The `acceptClient()` method uses the Winsock function `accept()` to complete the handshake with the client.
+#### ✅ **Purpose**
 
-Here’s what happens inside `acceptClient()`:
+This method blocks and waits for a client to attempt a connection. When a client does connect, it creates a new socket specifically for communicating with that client.
 
-- The call `accept(listenSocket, ...)` blocks until a connection attempt comes in (unless the socket is in non-blocking mode, but for simplicity assume it’s blocking). When a client connects, `accept` creates a **new socket** to represent the connection with that specific client. It returns this new socket handle. In Dice Duelers, the code probably stores this in a member variable like `clientSocket` or returns it to the caller. The original listening socket remains open, and *could accept another client if needed*, but since our game is two-player, we likely only need one client. 
-- Often, server code will close the listening socket after accepting one client to prevent any other connections (the Microsoft sample does this right after accept(). In any case, after a successful `accept`, we have an active TCP connection between the server and the client.
-- If `accept()` fails (returns `INVALID_SOCKET`), the method will handle that error. This could happen if the listening socket was closed or an error occurred. The code would likely output an error message with `WSAGetLastError()` and return a failure status. Otherwise, on success, the method might print something like “Client connected!” or simply proceed.
+------
+
+#### 🔍 **Line-by-Line Breakdown**
+
+##### 🧩 `clientSocket = accept(listenSocket, nullptr, nullptr);`
+
+- The `accept()` function is part of the Winsock API.
+- It waits (blocks) until an incoming client connection request is received.
+- Once a client connects:
+  - `accept()` returns a **new socket descriptor** — distinct from the `listenSocket`.
+  - This new `clientSocket` will be used for actual data communication.
+- Parameters:
+  - `listenSocket`: the socket already in listening mode.
+  - `nullptr, nullptr`: Normally used to retrieve client info (IP, port), but here we ignore it.
+
+------
+
+##### 🧩 `if (clientSocket == INVALID_SOCKET)`
+
+- If `accept()` fails, it returns `INVALID_SOCKET`.
+- Possible reasons:
+  - Listening socket was closed before `accept()`
+  - A socket-level error occurred
+- On failure, we:
+  - Print an error
+  - Return `false` to indicate the connection attempt failed
+
+------
+
+##### 🧩 On Success
+
+```c++
+std::cout << "Client connected!\n";
+return true;
+```
+
+- If `accept()` succeeds:
+  - The server has a live TCP connection with a client
+  - `clientSocket` now becomes the active endpoint for `recv()` and `send()` calls
+- The original `listenSocket` is often kept open, but in Dice Duelers, it typically serves just one client, so it could be closed later
+
+#### Receiving Messages from the Connected Client
+
+```c++
+std::string Server::receive() {
+    char buffer[1024] = {};
+    int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+    if (bytesReceived <= 0) return "";
+    return std::string(buffer, bytesReceived);
+}
+```
+
+####  **Purpose**
+
+This method receives incoming data from the connected client using the Winsock `recv()` function and returns it as a `std::string`. It’s used by the server to **read messages sent by the client** during the game.
+
+------
+
+#### 🔍 **Line-by-Line Explanation**
+
+##### 🧩 `char buffer[1024] = {};`
+
+- Creates a buffer to hold incoming data.
+- The buffer is initialized to 0s using `{}` (C++11 syntax).
+- The size `1024` means it can hold up to 1024 bytes per message.
+
+------
+
+##### 🧩 `int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);`
+
+- `recv()` reads data from the connected client socket.
+- Parameters:
+  - `clientSocket`: The socket connected to the client
+  - `buffer`: The memory area to store incoming data
+  - `sizeof(buffer)`: The maximum number of bytes to read (1024 here)
+  - `0`: Flags — usually 0 for basic receiving
+- Return value:
+  - **`> 0`** → number of bytes received
+  - **`0`** → the connection was closed by the client (graceful shutdown)
+  - **`< 0`** → an error occurred (e.g., socket issue, disconnect)
+
+------
+
+##### 🧩 `if (bytesReceived <= 0) return "";`
+
+- Handles connection closure or error:
+  - If the client disconnects or `recv()` fails, we return an empty string to indicate that no data was received.
+- This allows the calling code to detect disconnects or network errors.
+
+------
+
+##### 🧩 `return std::string(buffer, bytesReceived);`
+
+- Constructs and returns a `std::string` from the buffer.
+- The constructor takes `bytesReceived` so we only return **valid data**, ignoring any uninitialized parts of the buffer.
+
+### **Snippet Title:** “Sending Messages to the Connected Client”
+
+```c++
+bool Server::sendMessage(const std::string& message) {
+    int result = send(clientSocket, message.c_str(), message.length(), 0);
+    return result != SOCKET_ERROR;
+}
+```
+
+------
+
+#### ✅ **Purpose**
+
+This method sends a `std::string` message to the client using the Winsock `send()` function. It returns `true` on success and `false` if the message could not be sent.
+
+------
+
+#### 🔍 **Line-by-Line Explanation**
+
+🧩 `int result = send(...)`
+
+```c++
+result = send(clientSocket, message.c_str(), message.length(), 0);
+```
+
+- `send()` transmits bytes from your program to the remote peer (client).
+- Parameters:
+  - `clientSocket`: The socket representing the active connection to the client
+  - `message.c_str()`: A pointer to the character array (C-style string) containing the data
+  - `message.length()`: The number of bytes to send (excluding null terminator)
+  - `0`: Flags — `0` means default behavior (blocking send)
+- The function attempts to send the full message.
+- Return value:
+  - **`> 0`**: Number of bytes actually sent
+  - **`0`**: Remote side closed the connection (rare in blocking send)
+  - **`SOCKET_ERROR`**: Something went wrong (e.g., connection dropped, socket not valid)
+
+------
+
+🧩 `return result != SOCKET_ERROR;`
+
+- Returns `true` if the message was sent successfully
+- Returns `false` if there was an error
+- This enables the calling function to take action (e.g., retry, disconnect) if needed
+
+------
+
+##### ⚠️ Important Notes
+
+- **No newline or delimiter is added**: if you're using line-based protocols (e.g., `ROLL|6\n`), you must include those in `message`.
+- **No guarantee that all bytes are sent at once**: for short strings this is usually fine, but long data may require looping with `send()` until complete (not done here because this app sends short game commands).
