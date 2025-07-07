@@ -22,29 +22,16 @@
 
 ##### DESCRIPTION
 
-- Enter Name
-  - The player inputs their display name at the start of the game.
-
-- Select Host or Client
-  - The player decides whether to act as the server or connect as a client.
-
-- Send/Receive Player Name
-  - Names are exchanged between host and client over the network.
-
-- Enter Guess (1–6)
-  - The player chooses a number between 1 and 6 before the die roll.
-
-- Enter Stake
-  - The player bets a portion of their virtual balance.
-
-- View Round Result
-  - The player sees the outcome of the die roll and the round winner.
-
-- View Balances
-  - The system shows updated balances for both players after each round.
-
-- Decide to Continue or Exit
-  - After each round, the player chooses whether to play another round or quit the game.
+| **Step**                       | **Description**                                              |
+| ------------------------------ | ------------------------------------------------------------ |
+| **Enter Name**                 | The player inputs their display name at the start of the game. |
+| **Select Host or Client**      | The player decides whether to act as the server or connect as a client. |
+| **Send/Receive Player Name**   | Names are exchanged between host and client over the network. |
+| **Enter Guess (1–6)**          | The player chooses a number between 1 and 6 before the die roll. |
+| **Enter Stake**                | The player bets a portion of their virtual balance.          |
+| **View Round Result**          | The player sees the outcome of the die roll and the round winner. |
+| **View Balances**              | The system shows updated balances for both players after each round. |
+| **Decide to Continue or Exit** | After each round, the player chooses whether to play another round or quit the game. |
 
 ##### **DERIVING THE PLAYER CLASS DEFINITION**
 
